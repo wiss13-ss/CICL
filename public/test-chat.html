@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            gap: 20px;
+        }
+        .user-panel {
+            flex: 1;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .login-panel, .chat-panel {
+            margin-bottom: 20px;
+        }
+        input, button, textarea {
+            margin: 5px 0;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .messages {
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        .received {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+        }
+        .sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .conversations {
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .conversation {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .conversation:hover {
+            background-color: #f5f5f5;
+        }
+        .active {
+            background-color: #e6f7ff;
+        }
+        .message-form {
+            display: flex;
+            gap: 10px;
+        }
+        .message-input {
+            flex-grow: 1;
+        }
+        .send-button {
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Chat Interface</h1>
+    <p>Use this page to test chat functionality between two users</p>
+    
+    <div class="container">
+        <!-- User 1 Panel -->
+        <div class="user-panel" id="user1-panel">
+            <h2>User 1</h2>
+            <div class="login-panel" id="user1-login">
+                <h3>Login</h3>
+                <div>
+                    <input type="email" id="user1-email" placeholder="Email" value="admin@example.com">
+                    <input type="password" id="user1-password" placeholder="Password" value="password">
+                    <button id="user1-login-btn">Login</button>
+                    <button id="user1-test-btn">Use Test Account</button>
+                </div>
+            </div>
+            <div class="chat-panel" id="user1-chat" style="display: none;">
+                <h3>Conversations</h3>
+                <div class="conversations" id="user1-conversations"></div>
+                <button id="user1-new-conversation">New Conversation</button>
+                <div id="user1-new-conv-form" style="display: none;">
+                    <input type="text" id="user1-conv-name" placeholder="Conversation Name">
+                    <button id="user1-create-conversation">Create</button>
+                </div>
+                <h3>Chat</h3>
+                <div class="messages" id="user1-messages"></div>
+                <div class="message-form">
+                    <textarea class="message-input" id="user1-message" placeholder="Type a message..."></textarea>
+                    <button class="send-button" id="user1-send">Send</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- User 2 Panel -->
+        <div class="user-panel" id="user2-panel">
+            <h2>User 2</h2>
+            <div class="login-panel" id="user2-login">
+                <h3>Login</h3>
+                <div>
+                    <input type="email" id="user2-email" placeholder="Email" value="test@example.com">
+                    <input type="password" id="user2-password" placeholder="Password" value="testpassword">
+                    <button id="user2-login-btn">Login</button>
+                    <button id="user2-test-btn">Use Test Account</button>
+                </div>
+            </div>
+            <div class="chat-panel" id="user2-chat" style="display: none;">
+                <h3>Conversations</h3>
+                <div class="conversations" id="user2-conversations"></div>
+                <button id="user2-new-conversation">New Conversation</button>
+                <div id="user2-new-conv-form" style="display: none;">
+                    <input type="text" id="user2-conv-name" placeholder="Conversation Name">
+                    <button id="user2-create-conversation">Create</button>
+                </div>
+                <h3>Chat</h3>
+                <div class="messages" id="user2-messages"></div>
+                <div class="message-form">
+                    <textarea class="message-input" id="user2-message" placeholder="Type a message..."></textarea>
+                    <button class="send-button" id="user2-send">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL
+        const API_URL = 'http://localhost:5000/api';
+        
+        // WebSocket URL
+        const WS_URL = 'ws://localhost:5000/ws';
+        
+        // User data storage
+        const users = {
+            user1: {
+                token: null,
+                userId: null,
+                ws: null,
+                currentConversation: null
+            },
+            user2: {
+                token: null,
+                userId: null,
+                ws: null,
+                currentConversation: null
+            }
+        };
+        
+        // UI Elements - User 1
+        const user1LoginPanel = document.getElementById('user1-login');
+        const user1ChatPanel = document.getElementById('user1-chat');
+        const user1Email = document.getElementById('user1-email');
+        const user1Password = document.getElementById('user1-password');
+        const user1LoginBtn = document.getElementById('user1-login-btn');
+        const user1TestBtn = document.getElementById('user1-test-btn');
+        const user1Conversations = document.getElementById('user1-conversations');
+        const user1Messages = document.getElementById('user1-messages');
+        const user1Message = document.getElementById('user1-message');
+        const user1SendBtn = document.getElementById('user1-send');
+        const user1NewConvBtn = document.getElementById('user1-new-conversation');
+        const user1NewConvForm = document.getElementById('user1-new-conv-form');
+        const user1ConvName = document.getElementById('user1-conv-name');
+        const user1CreateConvBtn = document.getElementById('user1-create-conversation');
+        
+        // UI Elements - User 2
+        const user2LoginPanel = document.getElementById('user2-login');
+        const user2ChatPanel = document.getElementById('user2-chat');
+        const user2Email = document.getElementById('user2-email');
+        const user2Password = document.getElementById('user2-password');
+        const user2LoginBtn = document.getElementById('user2-login-btn');
+        const user2TestBtn = document.getElementById('user2-test-btn');
+        const user2Conversations = document.getElementById('user2-conversations');
+        const user2Messages = document.getElementById('user2-messages');
+        const user2Message = document.getElementById('user2-message');
+        const user2SendBtn = document.getElementById('user2-send');
+        const user2NewConvBtn = document.getElementById('user2-new-conversation');
+        const user2NewConvForm = document.getElementById('user2-new-conv-form');
+        const user2ConvName = document.getElementById('user2-conv-name');
+        const user2CreateConvBtn = document.getElementById('user2-create-conversation');
+        
+        // Login function
+        async function login(userPrefix, email, password) {
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store token and user ID
+                    users[userPrefix].token = data.token;
+                    users[userPrefix].userId = data.user.id;
+                    
+                    // Show chat panel
+                    document.getElementById(`${userPrefix}-login`).style.display = 'none';
+                    document.getElementById(`${userPrefix}-chat`).style.display = 'block';
+                    
+                    // Initialize WebSocket
+                    initWebSocket(userPrefix);
+                    
+                    // Load conversations
+                    loadConversations(userPrefix);
+                    
+                    return true;
+                } else {
+                    alert(`${userPrefix.toUpperCase()} Login Error: ${data.message}`);
+                    return false;
+                }
+            } catch (error) {
+                console.error(`${userPrefix} login error:`, error);
+                alert(`${userPrefix.toUpperCase()} Login Error: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Use test account
+        async function useTestAccount(userPrefix) {
+            try {
+                const response = await fetch(`${API_URL}/auth/create-test-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store token and user ID
+                    users[userPrefix].token = data.token;
+                    users[userPrefix].userId = data.user.id;
+                    
+                    // Show chat panel
+                    document.getElementById(`${userPrefix}-login`).style.display = 'none';
+                    document.getElementById(`${userPrefix}-chat`).style.display = 'block';
+                    
+                    // Initialize WebSocket
+                    initWebSocket(userPrefix);
+                    
+                    // Load conversations
+                    loadConversations(userPrefix);
+                    
+                    return true;
+                } else {
+                    alert(`${userPrefix.toUpperCase()} Test Login Error: ${data.message}`);
+                    return false;
+                }
+            } catch (error) {
+                console.error(`${userPrefix} test login error:`, error);
+                alert(`${userPrefix.toUpperCase()} Test Login Error: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Initialize WebSocket
+        function initWebSocket(userPrefix) {
+            // Close existing connection if any
+            if (users[userPrefix].ws) {
+                users[userPrefix].ws.close();
+            }
+            
+            // Create new WebSocket connection with token
+            users[userPrefix].ws = new WebSocket(`${WS_URL}?token=${users[userPrefix].token}`);
+            
+            // Connection opened
+            users[userPrefix].ws.addEventListener('open', (event) => {
+                console.log(`${userPrefix} WebSocket connected`);
+            });
+            
+            // Listen for messages
+            users[userPrefix].ws.addEventListener('message', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log(`${userPrefix} WebSocket message:`, data);
+                    
+                    if (data.type === 'new_message' || data.type === 'message_sent') {
+                        // If message is for current conversation, display it
+                        if (data.payload.conversation_id === users[userPrefix].currentConversation) {
+                            displayMessage(userPrefix, data.payload, data.payload.sender_id === users[userPrefix].userId);
+                        }
+                        
+                        // Refresh conversations list to show latest message
+                        loadConversations(userPrefix);
+                    } else if (data.type === 'conversation_update') {
+                        // Refresh conversations list
+                        loadConversations(userPrefix);
+                    }
+                } catch (error) {
+                    console.error(`${userPrefix} WebSocket message parsing error:`, error);
+                }
+            });
+            
+            // Connection closed
+            users[userPrefix].ws.addEventListener('close', (event) => {
+                console.log(`${userPrefix} WebSocket disconnected, code:`, event.code, 'reason:', event.reason);
+                
+                // Try to reconnect after a delay
+                setTimeout(() => {
+                    if (users[userPrefix].token) {
+                        initWebSocket(userPrefix);
+                    }
+                }, 3000);
+            });
+            
+            // Connection error
+            users[userPrefix].ws.addEventListener('error', (error) => {
+                console.error(`${userPrefix} WebSocket error:`, error);
+            });
+        }
+        
+        // Load conversations
+        async function loadConversations(userPrefix) {
+            try {
+                const response = await fetch(`${API_URL}/messages/conversations`, {
+                    headers: {
+                        'x-auth-token': users[userPrefix].token
+                    }
+                });
+                
+                if (response.ok) {
+                    const conversations = await response.json();
+                    const conversationsDiv = document.getElementById(`${userPrefix}-conversations`);
+                    
+                    // Clear existing conversations
+                    conversationsDiv.innerHTML = '';
+                    
+                    if (conversations.length === 0) {
+                        conversationsDiv.innerHTML = '<p>No conversations yet</p>';
+                    } else {
+                        conversations.forEach(conversation => {
+                            const div = document.createElement('div');
+                            div.className = 'conversation';
+                            if (conversation.id === users[userPrefix].currentConversation) {
+                                div.className += ' active';
+                            }
+                            
+                            const name = conversation.name || conversation.participants.map(p => `${p.first_name} ${p.last_name}`).join(', ');
+                            const lastMessage = conversation.last_message || 'No messages yet';
+                            
+                            div.innerHTML = `
+                                <strong>${name}</strong>
+                                <p>${lastMessage}</p>
+                            `;
+                            
+                            div.addEventListener('click', () => {
+                                // Set as current conversation
+                                users[userPrefix].currentConversation = conversation.id;
+                                
+                                // Update active class
+                                document.querySelectorAll(`#${userPrefix}-conversations .conversation`).forEach(el => {
+                                    el.classList.remove('active');
+                                });
+                                div.classList.add('active');
+                                
+                                // Load messages
+                                loadMessages(userPrefix, conversation.id);
+                            });
+                            
+                            conversationsDiv.appendChild(div);
+                        });
+                    }
+                } else {
+                    console.error(`${userPrefix} load conversations error:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`${userPrefix} load conversations error:`, error);
+            }
+        }
+        
+        // Load messages for a conversation
+        async function loadMessages(userPrefix, conversationId) {
+            try {
+                const response = await fetch(`${API_URL}/messages/conversations/${conversationId}/messages`, {
+                    headers: {
+                        'x-auth-token': users[userPrefix].token
+                    }
+                });
+                
+                if (response.ok) {
+                    const messages = await response.json();
+                    const messagesDiv = document.getElementById(`${userPrefix}-messages`);
+                    
+                    // Clear existing messages
+                    messagesDiv.innerHTML = '';
+                    
+                    if (messages.length === 0) {
+                        messagesDiv.innerHTML = '<p>No messages yet</p>';
+                    } else {
+                        messages.forEach(message => {
+                            displayMessage(userPrefix, message, message.sender_id === users[userPrefix].userId);
+                        });
+                        
+                        // Scroll to bottom
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    }
+                } else {
+                    console.error(`${userPrefix} load messages error:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`${userPrefix} load messages error:`, error);
+            }
+        }
+        
+        // Display a message
+        function displayMessage(userPrefix, message, isSent) {
+            const messagesDiv = document.getElementById(`${userPrefix}-messages`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            
+            const sender = isSent ? 'You' : `${message.first_name || 'User'} ${message.last_name || ''}`;
+            
+            messageDiv.innerHTML = `
+                <strong>${sender}</strong>
+                <p>${message.content}</p>
+                <small>${new Date(message.created_at).toLocaleTimeString()}</small>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Send a message
+        async function sendMessage(userPrefix) {
+            const messageInput = document.getElementById(`${userPrefix}-message`);
+            const content = messageInput.value.trim();
+            
+            if (!content || !users[userPrefix].currentConversation) return;
+            
+            try {
+                // Try to send via WebSocket
+                if (users[userPrefix].ws && users[userPrefix].ws.readyState === WebSocket.OPEN) {
+                    users[userPrefix].ws.send(JSON.stringify({
+                        type: 'send_message',
+                        payload: {
+                            conversation_id: users[userPrefix].currentConversation,
+                            content
+                        }
+                    }));
+                    
+                    // Clear input
+                    messageInput.value = '';
+                } else {
+                    // Fallback to REST API
+                    const response = await fetch(`${API_URL}/messages/conversations/${users[userPrefix].currentConversation}/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-auth-token': users[userPrefix].token
+                        },
+                        body: JSON.stringify({ content })
+                    });
+                    
+                    if (response.ok) {
+                        const message = await response.json();
+                        displayMessage(userPrefix, message, true);
+                        messageInput.value = '';
+                    } else {
+                        console.error(`${userPrefix} send message error:`, await response.text());
+                    }
+                }
+            } catch (error) {
+                console.error(`${userPrefix} send message error:`, error);
+            }
+        }
+        
+        // Create a new conversation
+        async function createConversation(userPrefix) {
+            const nameInput = document.getElementById(`${userPrefix}-conv-name`);
+            const name = nameInput.value.trim();
+            
+            if (!name) return;
+            
+            // Get the ID of the other user to add to conversation
+            const otherUserPrefix = userPrefix === 'user1' ? 'user2' : 'user1';
+            const participantIds = [users[otherUserPrefix].userId];
+            
+            try {
+                const response = await fetch(`${API_URL}/messages/conversations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': users[userPrefix].token
+                    },
+                    body: JSON.stringify({
+                        name,
+                        is_group: false,
+                        participant_ids: participantIds
+                    })
+                });
+                
+                if (response.ok) {
+                    const conversation = await response.json();
+                    
+                    // Set as current conversation
+                    users[userPrefix].currentConversation = conversation.id;
+                    
+                    // Reset form
+                    nameInput.value = '';
+                    document.getElementById(`${userPrefix}-new-conv-form`).style.display = 'none';
+                    
+                    // Load conversations
+                    loadConversations(userPrefix);
+                    
+                    // Load messages for the new conversation
+                    loadMessages(userPrefix, conversation.id);
+                } else {
+                    console.error(`${userPrefix} create conversation error:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`${userPrefix} create conversation error:`, error);
+            }
+        }
+        
+        // Event Listeners - User 1
+        user1LoginBtn.addEventListener('click', () => {
+            login('user1', user1Email.value, user1Password.value);
+        });
+        
+        user1TestBtn.addEventListener('click', () => {
+            useTestAccount('user1');
+        });
+        
+        user1SendBtn.addEventListener('click', () => {
+            sendMessage('user1');
+        });
+        
+        user1Message.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage('user1');
+            }
+        });
+        
+        user1NewConvBtn.addEventListener('click', () => {
+            user1NewConvForm.style.display = user1NewConvForm.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        user1CreateConvBtn.addEventListener('click', () => {
+            createConversation('user1');
+        });
+        
+        // Event Listeners - User 2
+        user2LoginBtn.addEventListener('click', () => {
+            login('user2', user2Email.value, user2Password.value);
+        });
+        
+        user2TestBtn.addEventListener('click', () => {
+            useTestAccount('user2');
+        });
+        
+        user2SendBtn.addEventListener('click', () => {
+            sendMessage('user2');
+        });
+        
+        user2Message.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage('user2');
+            }
+        });
+        
+        user2NewConvBtn.addEventListener('click', () => {
+            user2NewConvForm.style.display = user2NewConvForm.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        user2CreateConvBtn.addEventListener('click', () => {
+            createConversation('user2');
+        });
+    </script>
+</body>
+</html> 
